@@ -1,0 +1,4 @@
+# Prevent things from going into automatic Source Code release assets
+/.github export-ignore
+.gitattributes export-ignore
+README.md export-ignore
