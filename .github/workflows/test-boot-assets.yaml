@@ -1,5 +1,5 @@
 ---
-name: Talos Boot Assets Generation
+name: (TEST) Talos Boot Assets Generation
 
 on:
   schedule:
@@ -82,88 +82,8 @@ jobs:
       talosReleaseTag: ${{ steps.talos-release.outputs.talos_release_tag }}
       talosReleaseBody: ${{ steps.talos-release-body.outputs.talos_release_body }}
 
-  build-kernel:
-    needs: [ sync-pkgs-fork, check-releases ]
-    if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
-    name: Build kernel image
-    runs-on: ubuntu-latest
-
-    outputs:
-      sha: ${{ steps.hash.outputs.sha_short }}
-
-    steps:
-      - name: Maximize build space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.actor }}/pkgs
-          ref: main
-
-      - name: Get short commit hash
-        id: hash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build kernel image
-        env:
-          PLATFORM: linux/amd64
-          USERNAME: ${{ github.actor }}
-        run: make kernel PUSH=true
-
-  build-installer:
-    needs: [ check-releases, build-kernel ]
-    if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
-    name: Build installer image
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          repository: siderolabs/talos
-          ref: main # refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build installer image
-        env:
-          PLATFORM: linux/amd64
-          USERNAME: ${{ github.actor }}
-          TAG: ${{ needs.check-releases.outputs.talosReleaseTag }}-noext
-          PKG_KERNEL: ghcr.io/${{ github.actor }}/kernel:${{ needs.build-kernel.outputs.sha }}
-        run: make installer PUSH=true
-
   build-boot-assets:
-    needs: [ check-releases, build-installer ]
+    needs: [ check-releases ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build boot assets
     runs-on: ubuntu-latest
