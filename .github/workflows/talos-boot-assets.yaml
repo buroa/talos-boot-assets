@@ -13,7 +13,7 @@ env:
   # renovate: depName=ghcr.io/siderolabs/intel-ucode
   INTEL_UCODE_VERSION: 20231114
   # renovate: depName=ghcr.io/siderolabs/i915-ucode
-  I915_UCODE_VERSION: 20231030
+  I915_UCODE_VERSION: 20231111
 
 jobs:
   sync-pkgs-fork:
