@@ -67,20 +67,19 @@ jobs:
       with:
         repository: ${{ github.repository }}
         ref: talos
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
 
-    - name: Pull upstream changes
-      id: sync
-      uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
-      with:
-        target_sync_branch: talos
-        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-        target_branch_push_args: --force
-        upstream_sync_branch: refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }}
-        upstream_sync_repo: siderolabs/talos
-        git_config_pull_rebase: true
+    - name: Setup git
+      run: |
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
-    outputs:
-      has_new_commits: ${{ steps.sync.outputs.has_new_commits }}
+    - name: Sync upstream changes
+      run: |
+        git remote add talos https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/siderolabs/talos
+        git pull talos refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }} --rebase
+        git push --set-upstream origin talos --force
 
   sync-pkgs-fork:
     needs: [ check-releases ]
@@ -93,26 +92,25 @@ jobs:
       with:
         repository: ${{ github.repository }}
         ref: pkgs
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
 
-    - name: Get pkgs branch for talos release tag
-      id: get-pkgs-branch
+    - name: Get pkgs release tag
+      id: pkgs-release
       run: |
         release=release-$(grep -Eo '[0-9]\.[0-9]+' <<< '${{ needs.check-releases.outputs.talosReleaseTag }}')
         echo "release=$release" >> $GITHUB_OUTPUT
 
-    - name: Pull upstream changes
-      id: sync
-      uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
-      with:
-        target_sync_branch: pkgs
-        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-        target_branch_push_args: --force
-        upstream_sync_branch: ${{ steps.get-pkgs-branch.outputs.release }}
-        upstream_sync_repo: siderolabs/pkgs
-        git_config_pull_rebase: true
+    - name: Setup git
+      run: |
+        git config --global user.name "${{ github.actor }}"
+        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
 
-    outputs:
-      has_new_commits: ${{ steps.sync.outputs.has_new_commits }}
+    - name: Sync upstream changes
+      run: |
+        git remote add pkgs https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/siderolabs/pkgs
+        git pull pkgs ${{ steps.pkgs-release.outputs.release }} --rebase
+        git push --set-upstream origin pkgs --force
 
   build-kernel:
     needs: [ check-releases, sync-pkgs-fork ]
@@ -224,7 +222,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: talos-installer
-          path: /out/installer-amd64.tar
+          path: /out/metal-amd64-installer.tar
           if-no-files-found: error
           retention-days: 1
 
@@ -278,5 +276,5 @@ jobs:
         run: |
           crane push \
             --platform linux/amd64 \
-            /tmp/talos-build-assets/installer-amd64.tar \
+            /tmp/talos-build-assets/metal-amd64-installer.tar \
             ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }}
