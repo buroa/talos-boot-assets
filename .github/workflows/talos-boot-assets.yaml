@@ -16,31 +16,6 @@ env:
   I915_UCODE_VERSION: 20231111
 
 jobs:
-  sync-pkgs-fork:
-    name: Sync pkgs fork with upstream
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.repository }}
-        ref: pkgs
-
-    - name: Pull upstream changes
-      id: sync
-      uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
-      with:
-        target_sync_branch: pkgs
-        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-        target_branch_push_args: --force
-        upstream_sync_branch: main
-        upstream_sync_repo: siderolabs/pkgs
-        git_config_pull_rebase: true
-
-    outputs:
-      has_new_commits: ${{ steps.sync.outputs.has_new_commits }}
-
   check-releases:
     name: Check for new releases
     runs-on: ubuntu-latest
@@ -81,8 +56,66 @@ jobs:
       talosReleaseTag: ${{ steps.talos-release.outputs.talos_release_tag }}
       talosReleaseBody: ${{ steps.talos-release-body.outputs.talos_release_body }}
 
+  sync-talos-fork:
+    needs: [ check-releases ]
+    name: Sync talos fork with upstream
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository }}
+        ref: talos
+
+    - name: Pull upstream changes
+      id: sync
+      uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+      with:
+        target_sync_branch: talos
+        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+        target_branch_push_args: --force
+        upstream_sync_branch: refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }}
+        upstream_sync_repo: siderolabs/talos
+        git_config_pull_rebase: true
+
+    outputs:
+      has_new_commits: ${{ steps.sync.outputs.has_new_commits }}
+
+  sync-pkgs-fork:
+    needs: [ check-releases ]
+    name: Sync pkgs fork with upstream
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository }}
+        ref: pkgs
+
+    - name: Get pkgs branch for talos release tag
+      id: get-pkgs-branch
+      run: |
+        release=release-$(grep -Eo '[0-9]\.[0-9]+' <<< '${{ needs.check-releases.outputs.talosReleaseTag }}')
+        echo "release=$release" >> $GITHUB_OUTPUT
+
+    - name: Pull upstream changes
+      id: sync
+      uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+      with:
+        target_sync_branch: pkgs
+        target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+        target_branch_push_args: --force
+        upstream_sync_branch: ${{ steps.get-pkgs-branch.outputs.release }}
+        upstream_sync_repo: siderolabs/pkgs
+        git_config_pull_rebase: true
+
+    outputs:
+      has_new_commits: ${{ steps.sync.outputs.has_new_commits }}
+
   build-kernel:
-    needs: [ sync-pkgs-fork, check-releases ]
+    needs: [ check-releases, sync-pkgs-fork ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build kernel image
     runs-on: ubuntu-latest
@@ -106,7 +139,9 @@ jobs:
 
       - name: Get short commit hash
         id: hash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          sha_short=$(git rev-parse --short HEAD)
+          echo "sha_short=$sha_short" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -128,7 +163,7 @@ jobs:
         run: make kernel PUSH=true
 
   build-installer:
-    needs: [ check-releases, build-kernel ]
+    needs: [ check-releases, sync-talos-fork, build-kernel ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build installer image
     runs-on: ubuntu-latest
@@ -137,8 +172,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: siderolabs/talos
-          ref: main # refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }}
+          repository: ${{ github.repository }}
+          ref: talos
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
