@@ -30,7 +30,7 @@ const (
 const (
 	MiB = 1024 * 1024
 
-	EFISize      = 100 * MiB
+	EFISize      = 500 * MiB
 	BIOSGrubSize = 1 * MiB
 	BootSize     = 1000 * MiB
 	// EFIUKISize is the size of the EFI partition when UKI is enabled.
