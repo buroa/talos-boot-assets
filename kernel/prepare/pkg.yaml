@@ -9,6 +9,10 @@ steps:
         destination: linux.tar.xz
         sha256: "{{ .linux_sha256 }}"
         sha512: "{{ .linux_sha512 }}"
+      - url: https://github.com/t2linux/linux-t2-patches/archive/7a663cdeac58c12a32959036b3b256eb6994e940.tar.gz
+        destination: patches.tar.gz
+        sha256: b37be8f99dbce41ba40306610d9d36d18272973dde4cbe6b16860e6e26487625
+        sha512: a5b0d35cbb64281204378334e2d4b37971bbc952094942fa9abd75c3ef44dba25ee8fa7a67884f5d419cb6d7ea6c6e2b1234f7aa04aca8c96c9ce8909102984f
     env:
       ARCH: {{ if eq .ARCH "aarch64"}}arm64{{ else if eq .ARCH "x86_64" }}x86_64{{ else }}unsupported{{ end }}
     prepare:
@@ -40,6 +44,14 @@ steps:
         done
 
         make mrproper
+      - |
+        mkdir -p /pkg/patches
+        tar xf patches.tar.gz --strip-components=1 -C /pkg/patches
+      - |
+        while IFS= read -r file; do
+          echo "==> Adding $file"
+          patch -p1 < "$file"
+        done < <(find "/pkg/patches/" -type f -name "*.patch" | sort)
       - |
         cd /toolchain && git clone https://github.com/a13xp0p0v/kernel-hardening-checker.git
     install:

@@ -12,6 +12,14 @@ steps:
         cd /src
         cp -v /pkg/config-${CARCH} .config
         cp -v /pkg/certs/* certs/
+      - |
+        cd /src
+        scripts/config --enable CONFIG_USB4
+        scripts/config --enable CONFIG_USB4_NET
+        scripts/config --enable CONFIG_APPLE_BCE
+        scripts/config --enable CONFIG_SENSORS_APPLESMC
+        scripts/config --enable CONFIG_SENSORS_CORETEMP
+        scripts/config --enable CONFIG_HID_APPLE_IBRIDGE
     build:
       {{ if .BUILD_ARG_KERNEL_TARGET }}
       - |
