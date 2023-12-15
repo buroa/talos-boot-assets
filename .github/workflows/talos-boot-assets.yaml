@@ -171,7 +171,8 @@ jobs:
         env:
           PLATFORM: linux/amd64
           USERNAME: ${{ github.actor }}
-        run: make kernel PUSH=true
+          PUSH: "true"
+        run: make kernel
 
   build-installer:
     needs: [ check-releases, sync-talos-fork, build-kernel ]
@@ -205,7 +206,8 @@ jobs:
           USERNAME: ${{ github.actor }}
           TAG: ${{ needs.check-releases.outputs.talosReleaseTag }}
           PKG_KERNEL: ghcr.io/${{ github.actor }}/kernel:${{ needs.build-kernel.outputs.sha }}
-        run: make installer PUSH=true
+          PUSH: "true"
+        run: make installer
 
   build-boot-assets:
     needs: [ check-releases, build-installer ]
@@ -223,19 +225,19 @@ jobs:
         - /dev:/dev
 
     steps:
-      - name: Build amd64 installer w/ Intel & I915 Ucode
+      - name: Build amd64 installer with I915 & Intel Ucode
         run: |
           /bin/imager installer \
             --arch amd64 \
             --base-installer-image ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }} \
-            --system-extension-image ghcr.io/siderolabs/intel-ucode:${{ env.INTEL_UCODE_VERSION }} \
-            --system-extension-image ghcr.io/siderolabs/i915-ucode:${{ env.I915_UCODE_VERSION }}
+            --system-extension-image ghcr.io/siderolabs/i915-ucode:${{ env.I915_UCODE_VERSION }} \
+            --system-extension-image ghcr.io/siderolabs/intel-ucode:${{ env.INTEL_UCODE_VERSION }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v3
         with:
           name: talos-installer
-          path: /out/metal-amd64-installer.tar
+          path: /out/installer-amd64.tar
           if-no-files-found: error
           retention-days: 1
 
@@ -273,112 +275,11 @@ jobs:
         run: |
           crane push \
             --platform linux/amd64 \
-            /tmp/talos-build-assets/metal-amd64-installer.tar \
+            /tmp/talos-build-assets/installer-amd64.tar \
             ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }}
 
-  build-secure-boot-assets:
-    needs: [ check-releases, build-installer ]
-    if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
-    name: Build secure boot assets
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    container:
-      image: ghcr.io/buroa/installer:${{ needs.check-releases.outputs.talosReleaseTag }}
-      options: --privileged
-      volumes:
-        - /dev:/dev
-
-    steps:
-      - name: Write uki-signing-cert.pem
-        id: uki-signing-cert-pem
-        uses: timheuer/base64-to-file@784a1a4a994315802b7d8e2084e116e783d157be # v1.2.4
-        with:
-          encodedString: "${{ secrets.UKI_SIGNING_CERT }}"
-          fileDir: /secureboot
-          fileName: uki-signing-cert.pem
-
-      - name: Write uki-signing-key.pem
-        id: uki-signing-key-pem
-        uses: timheuer/base64-to-file@784a1a4a994315802b7d8e2084e116e783d157be # v1.2.4
-        with:
-          encodedString: "${{ secrets.UKI_SIGNING_KEY }}"
-          fileDir: /secureboot
-          fileName: uki-signing-key.pem
-
-      - name: Write pcr-signing-key.pem
-        id: pcr-signing-key-pem
-        uses: timheuer/base64-to-file@784a1a4a994315802b7d8e2084e116e783d157be # v1.2.4
-        with:
-          encodedString: "${{ secrets.PCR_SIGNING_KEY }}"
-          fileDir: /secureboot
-          fileName: pcr-signing-key.pem
-
-      - name: Write pcr-signing-public-key.pem
-        id: pcr-signing-public-key-pem
-        uses: timheuer/base64-to-file@784a1a4a994315802b7d8e2084e116e783d157be # v1.2.4
-        with:
-          encodedString: "${{ secrets.PCR_SIGNING_PUBLIC_KEY }}"
-          fileDir: /secureboot
-          fileName: pcr-signing-public-key.pem
-
-      - name: Build amd64 secureboot-installer w/ Intel & I915 Ucode
-        run: |
-          /bin/imager secureboot-installer \
-            --arch amd64 \
-            --base-installer-image ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }} \
-            --system-extension-image ghcr.io/siderolabs/intel-ucode:${{ env.INTEL_UCODE_VERSION }} \
-            --system-extension-image ghcr.io/siderolabs/i915-ucode:${{ env.I915_UCODE_VERSION }}
-
-      - name: Upload secureboot-installer artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: talos-secureboot-installer
-          path: /out/metal-amd64-secureboot-installer.tar
-          if-no-files-found: error
-          retention-days: 1
-
-  push-secureboot-installer-image:
-    needs: [ check-releases, build-secure-boot-assets ]
-    name: Push secureboot-installer image
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Download talos secureboot-installer image
-        uses: actions/download-artifact@v3
-        with:
-          name: talos-secureboot-installer
-          path: /tmp/talos-build-assets
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3.0.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: imjasonh/setup-crane@v0.3
-      - name: Push secureboot-installer image
-        run: |
-          crane push \
-            --platform linux/amd64 \
-            /tmp/talos-build-assets/metal-amd64-secureboot-installer.tar \
-            ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }}-secureboot
-
   create-release:
-    needs: [ check-releases, push-installer-image, push-secureboot-installer-image ]
+    needs: [ check-releases, push-installer-image ]
     if: needs.check-releases.outputs.newTalosReleaseFound
     name: Create a new release
     runs-on: ubuntu-latest
