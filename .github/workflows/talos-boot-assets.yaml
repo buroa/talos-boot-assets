@@ -235,7 +235,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: talos-installer
-          path: /out/metal-amd64-installer.tar
+          path: /out/installer-amd64.tar
           if-no-files-found: error
           retention-days: 1
 
@@ -273,7 +273,7 @@ jobs:
         run: |
           crane push \
             --platform linux/amd64 \
-            /tmp/talos-build-assets/metal-amd64-installer.tar \
+            /tmp/talos-build-assets/installer-amd64.tar \
             ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }}
 
   build-secure-boot-assets:
@@ -336,7 +336,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: talos-secureboot-installer
-          path: /out/metal-amd64-secureboot-installer.tar
+          path: /out/installer-amd64-secureboot.tar
           if-no-files-found: error
           retention-days: 1
 
@@ -374,7 +374,7 @@ jobs:
         run: |
           crane push \
             --platform linux/amd64 \
-            /tmp/talos-build-assets/metal-amd64-secureboot-installer.tar \
+            /tmp/talos-build-assets/installer-amd64-secureboot.tar \
             ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }}-secureboot
 
   create-release:
