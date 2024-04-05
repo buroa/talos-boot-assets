@@ -2,9 +2,14 @@
 name: Talos Boot Assets Generation
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Talos version
+        default: latest
+        required: false
   schedule:
     - cron: "0 * * * *"
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.actor }}-build
@@ -21,24 +26,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fetch latest Talos release version
+      - name: Fetch Talos release version
         id: talos-release
         run: |
-          talos_release_tag=$(curl -sL https://api.github.com/repos/siderolabs/talos/releases/latest | jq -r ".tag_name")
+          if [ "${{ inputs.version }}" != "latest" ]; then
+            talos_release_tag="${{ inputs.version }}"
+          else
+            talos_release_tag=$(curl -sL https://api.github.com/repos/siderolabs/talos/releases/latest | jq -r ".tag_name")
+          fi
           echo "talos_release_tag=$talos_release_tag" >> $GITHUB_OUTPUT
+
+      - name: Fetch Talos release body
+        id: talos-release-body
+        run: |
+          echo 'talos_release_body<<EOF' >> $GITHUB_OUTPUT
+          curl -sL https://api.github.com/repos/siderolabs/talos/releases/tags/${{ steps.talos-release.outputs.talos_release_tag }} | jq -r ".body" >> $GITHUB_OUTPUT
+          echo EOF >> $GITHUB_OUTPUT
 
       - name: Fetch latest Boot Asset release version
         id: boot-asset-release
         run: |
-          boot_assets_release_tag=$(curl -sL https://api.github.com/repos/buroa/talos-boot-assets/releases/latest | jq -r ".tag_name")
+          boot_assets_release_tag=$(curl -sL https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r ".tag_name")
           echo "boot_assets_release_tag=$boot_assets_release_tag" >> $GITHUB_OUTPUT
-
-      - name: Fetch latest Talos release body
-        id: talos-release-body
-        run: |
-          echo 'talos_release_body<<EOF' >> $GITHUB_OUTPUT
-          curl -sL https://api.github.com/repos/siderolabs/talos/releases/latest | jq -r ".body" >> $GITHUB_OUTPUT
-          echo EOF >> $GITHUB_OUTPUT
 
       - name: Compare release versions
         if: steps.talos-release.outputs.talos_release_tag != steps.boot-asset-release.outputs.boot_assets_release_tag
@@ -56,94 +65,45 @@ jobs:
       talosReleaseTag: ${{ steps.talos-release.outputs.talos_release_tag }}
       talosReleaseBody: ${{ steps.talos-release-body.outputs.talos_release_body }}
 
-  sync-talos-fork:
-    needs: [ check-releases ]
-    name: Sync talos fork with upstream
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.repository }}
-        ref: talos
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
-
-    - name: Setup git
-      run: |
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-
-    - name: Sync upstream changes
-      run: |
-        git remote add talos https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/siderolabs/talos
-        git pull talos refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }} --rebase
-        git push --set-upstream origin talos --force
-
-  sync-pkgs-fork:
-    needs: [ check-releases ]
-    name: Sync pkgs fork with upstream
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.repository }}
-        ref: pkgs
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
-
-    - name: Get pkgs release tag
-      id: pkgs-release
-      run: |
-        release=release-$(grep -Eo '[0-9]\.[0-9]+' <<< '${{ needs.check-releases.outputs.talosReleaseTag }}')
-        echo "release=$release" >> $GITHUB_OUTPUT
-
-    - name: Setup git
-      run: |
-        git config --global user.name "${{ github.actor }}"
-        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-
-    - name: Sync upstream changes
-      run: |
-        git remote add pkgs https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/siderolabs/pkgs
-        git pull pkgs ${{ steps.pkgs-release.outputs.release }} --rebase
-        git push --set-upstream origin pkgs --force
-
   build-kernel:
-    needs: [ check-releases, sync-pkgs-fork ]
+    needs: [ check-releases ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build kernel image
     runs-on: ubuntu-latest
 
-    outputs:
-      sha: ${{ steps.hash.outputs.sha_short }}
-
     steps:
+      - name: Get pkgs release tag
+        id: pkgs-release
+        run: |
+          release=release-$(grep -Eo '[0-9]\.[0-9]+' <<< '${{ needs.check-releases.outputs.talosReleaseTag }}')
+          echo "release=$release" >> $GITHUB_OUTPUT
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          repository: siderolabs/pkgs
+          ref: ${{ steps.pkgs-release.outputs.release }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Checkout patches
+        uses: actions/checkout@v4
+        with:
           repository: ${{ github.repository }}
-          ref: pkgs
+          ref: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: patches
+          sparse-checkout: patches/pkgs
+          sparse-checkout-cone-mode: false
 
-      - name: Get short commit hash
-        id: hash
+      - name: Apply patches
         run: |
-          sha_short=$(git rev-parse --short HEAD)
-          echo "sha_short=$sha_short" >> $GITHUB_OUTPUT
-
-      - name: Check if kernel image is already built
-        id: check
-        run: |
-          token=$(echo "${{ secrets.GITHUB_TOKEN }}" | base64)
-          tags=$(curl -H "Authorization: Bearer $token" https://ghcr.io/v2/${{ github.actor }}/kernel/tags/list)
-          built=$(echo "$tags" | jq -r '.tags | contains(["${{ steps.hash.outputs.sha_short }}"])')
-          echo "built=$built" >> $GITHUB_OUTPUT
+          while IFS= read -r file; do
+            echo "==> Adding $file"
+            git apply -v $file
+          done < <(find "./patches/patches/pkgs" -type f -name "*.patch" | sort)
 
       - name: Maximize build space
-        if: steps.check.outputs.built == 'false'
         uses: jlumbroso/free-disk-space@main
         with:
           large-packages: true
@@ -151,15 +111,12 @@ jobs:
           swap-storage: true
 
       - name: Set up QEMU
-        if: steps.check.outputs.built == 'false'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        if: steps.check.outputs.built == 'false'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to GitHub Container Registry
-        if: steps.check.outputs.built == 'false'
         uses: docker/login-action@v3.1.0
         with:
           registry: ghcr.io
@@ -167,15 +124,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build kernel image
-        if: steps.check.outputs.built == 'false'
-        env:
-          PLATFORM: linux/amd64
-          USERNAME: ${{ github.actor }}
-          PUSH: "true"
-        run: make kernel
+        run: |
+          make kernel \
+            PLATFORM=linux/amd64 \
+            USERNAME="${{ github.actor }}" \
+            TAG="${{ needs.check-releases.outputs.talosReleaseTag }}" \
+            PUSH="true"
 
   build-installer:
-    needs: [ check-releases, sync-talos-fork, build-kernel ]
+    needs: [ check-releases, build-kernel ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build installer image
     runs-on: ubuntu-latest
@@ -184,8 +141,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          repository: siderolabs/talos
+          ref: refs/tags/${{ needs.check-releases.outputs.talosReleaseTag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Checkout patches
+        uses: actions/checkout@v4
+        with:
           repository: ${{ github.repository }}
-          ref: talos
+          ref: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: patches
+          sparse-checkout: patches/talos
+          sparse-checkout-cone-mode: false
+
+      - name: Apply patches
+        run: |
+          while IFS= read -r file; do
+            echo "==> Adding $file"
+            git apply -v $file
+          done < <(find "./patches/patches/talos" -type f -name "*.patch" | sort)
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -201,13 +177,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build installer image
-        env:
-          PLATFORM: linux/amd64
-          USERNAME: ${{ github.actor }}
-          TAG: ${{ needs.check-releases.outputs.talosReleaseTag }}
-          PKG_KERNEL: ghcr.io/${{ github.actor }}/kernel:${{ needs.build-kernel.outputs.sha }}
-          PUSH: "true"
-        run: make installer
+        run: |
+          make installer \
+            PLATFORM="linux/amd64" \
+            USERNAME="${{ github.actor }}" \
+            TAG="${{ needs.check-releases.outputs.talosReleaseTag }}" \
+            PKG_KERNEL="ghcr.io/${{ github.actor }}/kernel:${{ needs.check-releases.outputs.talosReleaseTag }}" \
+            PUSH="true"
 
   build-boot-assets:
     needs: [ check-releases, build-installer ]
@@ -219,7 +195,7 @@ jobs:
       contents: write
 
     container:
-      image: ghcr.io/buroa/installer:${{ needs.check-releases.outputs.talosReleaseTag }}
+      image: ghcr.io/${{ github.actor }}/installer:${{ needs.check-releases.outputs.talosReleaseTag }}
       options: --privileged
       volumes:
         - /dev:/dev
