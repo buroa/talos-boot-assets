@@ -15,6 +15,7 @@ concurrency:
   group: ${{ github.actor }}-build
 
 env:
+  TALOS_VERSION : "${{ inputs.version || 'latest' }}"
   # renovate: depName=ghcr.io/siderolabs/intel-ucode
   INTEL_UCODE_VERSION: 20231114
   # renovate: depName=ghcr.io/siderolabs/i915-ucode
@@ -29,10 +30,10 @@ jobs:
       - name: Fetch Talos release version
         id: talos-release
         run: |
-          if [ "${{ inputs.version }}" != "latest" ]; then
-            talos_release_tag="${{ inputs.version }}"
-          else
+          if [ "${{ env.TALOS_VERSION }}" == "latest" ]; then
             talos_release_tag=$(curl -sL https://api.github.com/repos/siderolabs/talos/releases/latest | jq -r ".tag_name")
+          else
+            talos_release_tag="${{ env.TALOS_VERSION }}"
           fi
           echo "talos_release_tag=$talos_release_tag" >> $GITHUB_OUTPUT
 
