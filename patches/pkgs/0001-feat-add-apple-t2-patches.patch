@@ -1,26 +1,30 @@
-From a1c892e579f5191fd09fb377794b8675fb2b79f1 Mon Sep 17 00:00:00 2001
+From a1b7ac4e59f8905d19b33acd9e6b8e04161412b3 Mon Sep 17 00:00:00 2001
 From: Steven Kreitzer <skre@skre.me>
-Date: Fri, 15 Dec 2023 05:36:52 -0600
+Date: Fri, 19 Apr 2024 09:49:52 -0500
 Subject: [PATCH] feat: add apple t2 patches
 
 Signed-off-by: Steven Kreitzer <skre@skre.me>
 ---
- kernel/build/pkg.yaml   |  7 +++++++
+ kernel/build/pkg.yaml   | 11 +++++++++++
  kernel/prepare/pkg.yaml | 12 ++++++++++++
- 2 files changed, 19 insertions(+)
+ 2 files changed, 23 insertions(+)
 
 diff --git a/kernel/build/pkg.yaml b/kernel/build/pkg.yaml
-index 35f0e380f..1a3ccc31c 100644
+index 27aaccf..34f704c 100644
 --- a/kernel/build/pkg.yaml
 +++ b/kernel/build/pkg.yaml
-@@ -12,6 +12,13 @@ steps:
+@@ -12,6 +12,17 @@ steps:
          cd /src
          cp -v /pkg/config-${CARCH} .config
          cp -v /pkg/certs/* certs/
 +      - |
 +        cd /src
 +        scripts/config --enable CONFIG_APPLE_BCE
-+        scripts/config --enable CONFIG_HID_APPLE_IBRIDGE
++        scripts/config --enable CONFIG_APPLE_GMUX
++        scripts/config --enable CONFIG_BRCMFMAC
++        scripts/config --enable CONFIG_HID_APPLETB_BL
++        scripts/config --enable CONFIG_HID_APPLETB_KBD
++        scripts/config --enable CONFIG_DRM_APPLETBDRM
 +        scripts/config --enable CONFIG_SENSORS_APPLESMC
 +        scripts/config --enable CONFIG_USB4
 +        scripts/config --enable CONFIG_USB4_NET
@@ -28,21 +32,21 @@ index 35f0e380f..1a3ccc31c 100644
        {{ if .BUILD_ARG_KERNEL_TARGET }}
        - |
 diff --git a/kernel/prepare/pkg.yaml b/kernel/prepare/pkg.yaml
-index 35dba08d1..b369f4976 100644
+index f82ddcf..397f86b 100644
 --- a/kernel/prepare/pkg.yaml
 +++ b/kernel/prepare/pkg.yaml
 @@ -9,6 +9,10 @@ steps:
          destination: linux.tar.xz
          sha256: "{{ .linux_sha256 }}"
          sha512: "{{ .linux_sha512 }}"
-+      - url: https://github.com/t2linux/linux-t2-patches/archive/15ed66844da78b46dde88fd361154c95b37d0286.tar.gz
++      - url: https://github.com/t2linux/linux-t2-patches/archive/394415a78f655184ebc4a421d720036ac3fc021b.tar.gz
 +        destination: patches.tar.gz
-+        sha256: 8d80db3d846eed1e9b30fb29b3004ba440f4cd3509700045cc3e9216382eacbc
-+        sha512: d7317bda6c056d7c11b642a98e65e6ee8ae635995ff3f58e258f6bfa140a767cf07bc91c2db2a3f6e528fe793f492543ef2d6799dfda95d30852eceac467477b
++        sha256: 417c9f1f22d89c4290bdc72013fdf4c3d0c762c09439e7c0fb45376074b1e5df
++        sha512: 9d484b0f867eec6112c05ba9a670a9015a950f699e4596a7e072d795190663ae0161b2815d38511fb73d51cca5392a7244302bbc1f6c63c7c7fe31f775ad9204
      env:
        ARCH: {{ if eq .ARCH "aarch64"}}arm64{{ else if eq .ARCH "x86_64" }}x86_64{{ else }}unsupported{{ end }}
      prepare:
-@@ -40,6 +44,14 @@ steps:
+@@ -39,6 +43,14 @@ steps:
          done
  
          make mrproper
