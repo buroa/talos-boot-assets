@@ -1,59 +1,42 @@
-From 2881c7f0743be66669f3b4a4f547c88811ee9b9e Mon Sep 17 00:00:00 2001
+From f5840525343c6fee8a55b9c3075897b188c1796a Mon Sep 17 00:00:00 2001
 From: Steven Kreitzer <skre@skre.me>
-Date: Fri, 19 Apr 2024 09:49:52 -0500
+Date: Fri, 17 May 2024 11:11:23 -0500
 Subject: [PATCH] feat: add apple t2 patches
 
 Signed-off-by: Steven Kreitzer <skre@skre.me>
 ---
- kernel/build/pkg.yaml                         |  6 ++++++
- kernel/build/scripts/filter-hardened-check.py |  4 +++-
- kernel/prepare/pkg.yaml                       | 12 ++++++++++++
- 3 files changed, 21 insertions(+), 1 deletion(-)
+ kernel/build/pkg.yaml   |  5 +++++
+ kernel/prepare/pkg.yaml | 12 ++++++++++++
+ 2 files changed, 17 insertions(+)
 
 diff --git a/kernel/build/pkg.yaml b/kernel/build/pkg.yaml
-index 27aaccf..1cd4b44 100644
+index 27aaccf..a4e3bd2 100644
 --- a/kernel/build/pkg.yaml
 +++ b/kernel/build/pkg.yaml
-@@ -12,6 +12,12 @@ steps:
+@@ -12,6 +12,11 @@ steps:
          cd /src
          cp -v /pkg/config-${CARCH} .config
          cp -v /pkg/certs/* certs/
 +      - |
 +        cd /src
-+        scripts/config --undefine CONFIG_EFI_DISABLE_PCI_DMA
 +        scripts/config --enable CONFIG_SENSORS_APPLESMC
 +        scripts/config --enable CONFIG_USB4
 +        scripts/config --enable CONFIG_USB4_NET
      build:
        {{ if .BUILD_ARG_KERNEL_TARGET }}
        - |
-diff --git a/kernel/build/scripts/filter-hardened-check.py b/kernel/build/scripts/filter-hardened-check.py
-index 085ae2b..b8123ec 100644
---- a/kernel/build/scripts/filter-hardened-check.py
-+++ b/kernel/build/scripts/filter-hardened-check.py
-@@ -38,7 +38,9 @@ IGNORE_VIOLATIONS_BY_ARCH = {
-         'CONFIG_ARM64_BTI_KERNEL', # can't seem to enable this, probably because we're using gcc, see https://github.com/siderolabs/pkgs/issues/918
-         'CONFIG_EFI_DISABLE_PCI_DMA', # for arm64, enabling this breaks boot with no visible error messages to debug.
-     },
--    'amd64': {},
-+    'amd64': {
-+        'CONFIG_EFI_DISABLE_PCI_DMA', # for amd64, enabling this breaks boot for apple t2 macs.
-+    },
- }
- 
- def main():
 diff --git a/kernel/prepare/pkg.yaml b/kernel/prepare/pkg.yaml
-index f82ddcf..397f86b 100644
+index f82ddcf..627f5be 100644
 --- a/kernel/prepare/pkg.yaml
 +++ b/kernel/prepare/pkg.yaml
 @@ -9,6 +9,10 @@ steps:
          destination: linux.tar.xz
          sha256: "{{ .linux_sha256 }}"
          sha512: "{{ .linux_sha512 }}"
-+      - url: https://github.com/t2linux/linux-t2-patches/archive/394415a78f655184ebc4a421d720036ac3fc021b.tar.gz
++      - url: https://github.com/t2linux/linux-t2-patches/archive/0fc9df415d44548a292ff7a9cc4ee5984d2999ac.tar.gz
 +        destination: patches.tar.gz
-+        sha256: 417c9f1f22d89c4290bdc72013fdf4c3d0c762c09439e7c0fb45376074b1e5df
-+        sha512: 9d484b0f867eec6112c05ba9a670a9015a950f699e4596a7e072d795190663ae0161b2815d38511fb73d51cca5392a7244302bbc1f6c63c7c7fe31f775ad9204
++        sha256: 2cf811c0e31f75ab60124d98e1cb0ab742f06e9c5f44eef92205ec00965ebe7d
++        sha512: 33ed7efab3628ba8950c6ec42eee2939585bdd8d08b51bb6453ea86a69e014f637de6d4250be19e411640a24d33f65065069a804ab367a4b74e5bf6134195415
      env:
        ARCH: {{ if eq .ARCH "aarch64"}}arm64{{ else if eq .ARCH "x86_64" }}x86_64{{ else }}unsupported{{ end }}
      prepare:
