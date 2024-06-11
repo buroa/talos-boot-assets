@@ -247,7 +247,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: imjasonh/setup-crane@v0.3
+      - uses: imjasonh/setup-crane@v0.4
       - name: Push installer image
         run: |
           crane push \
