@@ -27,6 +27,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Fetch Talos release version
         id: talos-release
         run: |
@@ -37,14 +42,7 @@ jobs:
           fi
           echo "talos_release_tag=$talos_release_tag" >> $GITHUB_OUTPUT
 
-      - name: Fetch Talos release body
-        id: talos-release-body
-        run: |
-          echo 'talos_release_body<<EOF' >> $GITHUB_OUTPUT
-          curl -sL https://api.github.com/repos/siderolabs/talos/releases/tags/${{ steps.talos-release.outputs.talos_release_tag }} | jq -r ".body" >> $GITHUB_OUTPUT
-          echo EOF >> $GITHUB_OUTPUT
-
-      - name: Fetch latest Boot Asset release version
+      - name: Fetch latest Boot Assets release version
         id: boot-asset-release
         run: |
           boot_assets_release_tag=$(curl -sL https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r ".tag_name")
@@ -54,9 +52,7 @@ jobs:
         if: steps.talos-release.outputs.talos_release_tag != steps.boot-asset-release.outputs.boot_assets_release_tag
         id: compare-releases
         run: |
-          curl https://raw.githubusercontent.com/Ariel-Rodriguez/sh-semversion-2/main/semver2.sh -o /tmp/semver2.sh
-          chmod +x /tmp/semver2.sh
-          compare_result=$(/tmp/semver2.sh \
+          compare_result=$(./.github/scripts/semver2.sh \
             ${{ steps.talos-release.outputs.talos_release_tag }} \
             ${{ steps.boot-asset-release.outputs.boot_assets_release_tag }})
           echo "compare_result=$compare_result" >> $GITHUB_OUTPUT
@@ -64,7 +60,6 @@ jobs:
     outputs:
       newTalosReleaseFound: ${{ steps.compare-releases.outputs.compare_result }}
       talosReleaseTag: ${{ steps.talos-release.outputs.talos_release_tag }}
-      talosReleaseBody: ${{ steps.talos-release-body.outputs.talos_release_body }}
 
   build-kernel:
     needs: [ check-releases ]
@@ -265,8 +260,15 @@ jobs:
       contents: write
 
     steps:
+      - name: Fetch Talos release body
+        id: talos-release-body
+        run: |
+          echo 'talos_release_body<<EOF' >> $GITHUB_OUTPUT
+          curl -sL https://api.github.com/repos/siderolabs/talos/releases/tags/${{ needs.check-releases.outputs.talosReleaseTag }} | jq -r ".body" >> $GITHUB_OUTPUT
+          echo EOF >> $GITHUB_OUTPUT
+
       - name: Create a new release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.check-releases.outputs.talosReleaseTag }}
-          body: ${{ needs.check-releases.outputs.talosReleaseBody }}
+          body: ${{ steps.talos-release-body.outputs.talos_release_body }}
