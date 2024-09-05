@@ -217,7 +217,7 @@ jobs:
 
     steps:
       - name: Download talos installer image
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@v4.1.8
         with:
           name: talos-installer
           path: /tmp/talos-build-assets
