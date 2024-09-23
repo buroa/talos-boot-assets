@@ -119,13 +119,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Build kernel image
-      #   run: |
-      #     make kernel \
-      #       PLATFORM=linux/amd64 \
-      #       USERNAME="${{ github.actor }}" \
-      #       TAG="${{ needs.check-releases.outputs.talosReleaseTag }}" \
-      #      PUSH="true"
+      - name: Build kernel image
+        run: |
+          make kernel \
+            PLATFORM=linux/amd64 \
+            USERNAME="${{ github.actor }}" \
+            TAG="${{ needs.check-releases.outputs.talosReleaseTag }}" \
+            PUSH="true"
 
   build-installer:
     needs: [ check-releases, build-kernel ]
