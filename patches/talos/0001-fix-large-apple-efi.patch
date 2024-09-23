@@ -1,21 +1,20 @@
-From 60659a28f750cdd0bb71ac73e14fd878c91e0b8a Mon Sep 17 00:00:00 2001
+From 2d374a1f9960ec2b69c0af2639908f8a06119143 Mon Sep 17 00:00:00 2001
 From: Steven Kreitzer <skre@skre.me>
-Date: Fri, 15 Dec 2023 05:42:06 -0600
+Date: Mon, 23 Sep 2024 15:29:54 -0500
 Subject: [PATCH] fix: large apple efi
 
-Signed-off-by: Steven Kreitzer <skre@skre.me>
 ---
  internal/pkg/partition/constants.go | 2 +-
  pkg/imager/profile/default.go       | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/internal/pkg/partition/constants.go b/internal/pkg/partition/constants.go
-index 534537181..d18877cd1 100644
+index 0f2c8d17f..756c4b101 100644
 --- a/internal/pkg/partition/constants.go
 +++ b/internal/pkg/partition/constants.go
-@@ -30,7 +30,7 @@ const (
- const (
+@@ -32,7 +32,7 @@ const (
  	MiB = 1024 * 1024
+ 	GiB = 1024 * MiB
  
 -	EFISize      = 100 * MiB
 +	EFISize      = 500 * MiB
@@ -23,7 +22,7 @@ index 534537181..d18877cd1 100644
  	BootSize     = 1000 * MiB
  	// EFIUKISize is the size of the EFI partition when UKI is enabled.
 diff --git a/pkg/imager/profile/default.go b/pkg/imager/profile/default.go
-index 45ab35873..54261f81d 100644
+index b780ff3ef..4acc7f04f 100644
 --- a/pkg/imager/profile/default.go
 +++ b/pkg/imager/profile/default.go
 @@ -14,7 +14,7 @@ const (
@@ -36,5 +35,5 @@ index 45ab35873..54261f81d 100644
  	// DefaultRAWDiskSize is the value we use for any non-metal images by default.
  	DefaultRAWDiskSize = 8192 * mib
 -- 
-2.44.0
+2.46.0
 
