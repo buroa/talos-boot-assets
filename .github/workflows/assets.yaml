@@ -65,7 +65,7 @@ jobs:
     needs: [ check-releases ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build kernel image
-    runs-on: buildjet-64vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
 
     steps:
       - name: Get pkgs release tag
@@ -124,7 +124,7 @@ jobs:
     needs: [ check-releases, build-kernel ]
     if: needs.check-releases.outputs.newTalosReleaseFound || github.event_name == 'workflow_dispatch'
     name: Build installer image
-    runs-on: buildjet-64vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
