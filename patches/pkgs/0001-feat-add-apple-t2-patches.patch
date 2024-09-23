@@ -1,22 +1,21 @@
-From f5840525343c6fee8a55b9c3075897b188c1796a Mon Sep 17 00:00:00 2001
+From 46161fffa7dc9a891b963de4a83931798e22ff6c Mon Sep 17 00:00:00 2001
 From: Steven Kreitzer <skre@skre.me>
-Date: Fri, 17 May 2024 11:11:23 -0500
+Date: Mon, 23 Sep 2024 10:55:12 -0500
 Subject: [PATCH] feat: add apple t2 patches
 
-Signed-off-by: Steven Kreitzer <skre@skre.me>
 ---
  kernel/build/pkg.yaml   |  5 +++++
  kernel/prepare/pkg.yaml | 12 ++++++++++++
  2 files changed, 17 insertions(+)
 
 diff --git a/kernel/build/pkg.yaml b/kernel/build/pkg.yaml
-index 27aaccf..a4e3bd2 100644
+index 4a4c5ce..29ebff1 100644
 --- a/kernel/build/pkg.yaml
 +++ b/kernel/build/pkg.yaml
-@@ -12,6 +12,11 @@ steps:
-         cd /src
-         cp -v /pkg/config-${CARCH} .config
-         cp -v /pkg/certs/* certs/
+@@ -17,6 +17,11 @@ steps:
+         for patch in $(find /pkg/patches -type f -name "*.patch" | sort); do
+           patch -p1 < $patch || (echo "Failed to apply patch $patch" && exit 1)
+         done
 +      - |
 +        cd /src
 +        scripts/config --enable CONFIG_SENSORS_APPLESMC
@@ -26,17 +25,17 @@ index 27aaccf..a4e3bd2 100644
        {{ if .BUILD_ARG_KERNEL_TARGET }}
        - |
 diff --git a/kernel/prepare/pkg.yaml b/kernel/prepare/pkg.yaml
-index f82ddcf..627f5be 100644
+index f82ddcf..8f8f633 100644
 --- a/kernel/prepare/pkg.yaml
 +++ b/kernel/prepare/pkg.yaml
 @@ -9,6 +9,10 @@ steps:
          destination: linux.tar.xz
          sha256: "{{ .linux_sha256 }}"
          sha512: "{{ .linux_sha512 }}"
-+      - url: https://github.com/t2linux/linux-t2-patches/archive/0fc9df415d44548a292ff7a9cc4ee5984d2999ac.tar.gz
++      - url: https://github.com/t2linux/linux-t2-patches/archive/0d1e1094a6200579e400e5ca493562c31f7b715a.tar.gz
 +        destination: patches.tar.gz
-+        sha256: 2cf811c0e31f75ab60124d98e1cb0ab742f06e9c5f44eef92205ec00965ebe7d
-+        sha512: 33ed7efab3628ba8950c6ec42eee2939585bdd8d08b51bb6453ea86a69e014f637de6d4250be19e411640a24d33f65065069a804ab367a4b74e5bf6134195415
++        sha256: 54b9b1b15550622c024e788c3fb6944abe751154f6f10a984c134c5e87d7e0d4
++        sha512: ea5767ef9eb9598bff803a926db80dc7021cceb92856866e161bb27af824406ceb765ce5c44361bd9f61c6b1be42fa48fc6ef1f6cb461794b4036a0df1025fa5
      env:
        ARCH: {{ if eq .ARCH "aarch64"}}arm64{{ else if eq .ARCH "x86_64" }}x86_64{{ else }}unsupported{{ end }}
      prepare:
@@ -56,5 +55,5 @@ index f82ddcf..627f5be 100644
          cd /toolchain && git clone https://github.com/a13xp0p0v/kernel-hardening-checker.git
      install:
 -- 
-2.44.0
+2.46.0
 
