@@ -206,7 +206,7 @@ jobs:
             --system-extension-image ghcr.io/siderolabs/intel-ucode:${{ env.INTEL_UCODE_VERSION }}
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: talos-installer
           path: /out/installer-amd64.tar
@@ -224,7 +224,7 @@ jobs:
 
     steps:
       - name: Download talos installer image
-        uses: actions/download-artifact@v4.1.8
+        uses: actions/download-artifact@v4
         with:
           name: talos-installer
           path: /tmp/talos-build-assets
